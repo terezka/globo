@@ -1,7 +1,7 @@
 // point.go
 // 2016 giulio <giulioungaretti@me.com>
 
-package main
+package point
 
 import (
 	"encoding/json"
@@ -50,14 +50,19 @@ func (p Point) ToS2() uint64 {
 	return uint64(cellID)
 }
 
-func point(w http.ResponseWriter, r *http.Request) {
-	// request
-	decoder := json.NewDecoder(r.Body)
+func parseJSON(r *http.Request) (Point, error) {
 	var p Point
+	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&p)
+	return p, err
+}
+
+//Handler handles a request for a geojsonPoint
+func Handler(w http.ResponseWriter, r *http.Request) {
+	// request
+	p, err := parseJSON(r)
 	if err != nil {
-		log.Errorf("json error %v", err)
-		log.Errorf("Malformed %v request:%v", r.Method, r.Body)
+		log.Errorf("Malformed json in request:%v", r.Body)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

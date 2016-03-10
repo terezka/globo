@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -14,6 +15,16 @@ const Endpoint = "/tos2/geojson/"
 
 //Handler handles a request for a geojsonPoint
 func Handler(w http.ResponseWriter, r *http.Request) {
+	// parse form
+	var precision int
+	var err error
+	values := r.URL.Query()
+	if p, ok := values["precision"]; ok {
+		precision, err = strconv.Atoi(p[0])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
 	// request
 	resp, err := matcher(r)
 	if err != nil {
@@ -21,9 +32,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	// TODO extract from query
-	var prec int
-	s2 := resp.ToS2(&prec)
+	s2 := resp.ToS2(&precision)
 	// response
 	encoder := json.NewEncoder(w)
 	w.Header().Set("Content-Type", "application/json")

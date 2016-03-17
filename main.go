@@ -24,7 +24,7 @@ func main() {
 	http.Handle("/tos2/point", defaultMiddleware.Then(pointHandler))
 
 	// geojson
-	geoJSONHandler := http.HandlerFunc(geoJSON.Handl, r)
+	geoJSONHandler := http.HandlerFunc(geoJSON.Handler)
 	http.Handle(geoJSON.Endpoint, defaultMiddleware.Then(geoJSONHandler))
 
 	// server

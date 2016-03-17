@@ -44,7 +44,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	w.Header().Set("Content-Type", "application/json")
 	err = encoder.Encode(geoj)
-	log.Print(time.Since(t))
+	log.Debug(time.Since(t))
 	if err != nil {
 		log.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

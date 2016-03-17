@@ -1,4 +1,5 @@
-// Package geoJSON converts geoJSON TO s2
+// Package geoJSON converts geoJSON TO s2 and back to GeoJSON
+// this is mostly an endpoint to visualize the simplifications
 package geoJSON
 
 import (
@@ -6,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -15,6 +17,7 @@ const Endpoint = "/tos2/geojson/"
 
 //Handler handles a request for a geojsonPoint
 func Handler(w http.ResponseWriter, r *http.Request) {
+	t := time.Now()
 	// parse form
 	var precision int
 	var err error
@@ -24,7 +27,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
+	} else {
+		// set max precision
+		precision = 30
 	}
+	log.Debugf("Request with precision: %v", precision)
 	// request
 	resp, err := matcher(r)
 	if err != nil {
@@ -32,11 +39,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s2 := resp.ToS2(&precision)
+	s2 := resp.ToS2(precision)
+	geoj := resp.ToGeoJSON(s2)
 	// response
 	encoder := json.NewEncoder(w)
 	w.Header().Set("Content-Type", "application/json")
-	err = encoder.Encode(s2)
+	err = encoder.Encode(geoj)
+	log.Print(time.Since(t))
 	if err != nil {
 		log.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -44,8 +53,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Matcher exctract from the url witch geoJSON object we want
-func matcher(r *http.Request) (p geojson, err error) {
+// matcher exctract from the url witch geoJSON object we want
+func matcher(r *http.Request) (p geoJSON, err error) {
 	objectType := r.URL.Path[len(Endpoint):]
 	dec := json.NewDecoder(r.Body)
 	defer r.Body.Close()
@@ -56,9 +65,13 @@ func matcher(r *http.Request) (p geojson, err error) {
 		err = dec.Decode(&pp)
 		p = pp
 	case "polygon":
-		p = Polygon{}
+		pp := Polygon{}
+		err = dec.Decode(&pp)
+		p = pp
 	case "multipolygon":
-		p = MultiPolygon{}
+		pp := MultiPolygon{}
+		err = dec.Decode(&pp)
+		p = pp
 	default:
 		err = fmt.Errorf("Bad geoJSON object type")
 	}

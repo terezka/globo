@@ -2,31 +2,79 @@
 // 2016 giulio <giulioungaretti@me.com>
 package geoJSON
 
-import "github.com/golang/geo/s2"
+import (
+	"fmt"
+	"sort"
+	"strings"
 
-//Coordinates is a set of coordinate
-type Coordinates []Coordinate
+	log "github.com/Sirupsen/logrus"
+	"github.com/giulioungaretti/geo/s2"
+	"github.com/giulioungaretti/globo/point"
+)
 
 //Coordinate is a [longitude, latitude]
 type Coordinate [2]float64
 
-// Point rapresent a geojson point geometry object
+//Coordinates is a set of coordinate
+type Coordinates []Coordinate
+
+// Point rapresent a geoJSON point geometry object
 type Point struct {
 	Type       string `json:"type"`
 	Coordinate `json:"coordinates"`
 }
 
-// IsValid vaildates coordinate
-func (c *Coordinate) IsValid() bool {
+// Polygon rapresent a geoJSON polygon geometry object
+type Polygon struct {
+	Type string        `json:"type"`
+	C    []Coordinates `json:"coordinates"`
+}
+
+// MultiPolygon rapresent a geoJSON mulitpolygon  geometry object
+type MultiPolygon struct {
+	Type string          `json:"type"`
+	C    [][]Coordinates `json:"coordinates"`
+}
+
+// Prop is a geoJSON property
+type Prop map[string]string
+
+// Feature is a geoJSON feature
+type Feature struct {
+	Type       string      `json:"type"`
+	Geometry   interface{} `json:"geometry"`
+	Properties Prop        `json:"properties"`
+}
+
+//FeatureCollection is a geoJSON Feature colelction
+type FeatureCollection struct {
+	Type string    `json:"type"`
+	Feat []Feature `json:"features"`
+}
+
+// geoJSON is the interface that allows any geojson to be unmarshaled
+// converted to s2, and marhsaled back to be visualized
+type geoJSON interface {
+	ToS2(int) [][]uint64
+	ToGeoJSON(in [][]uint64) FeatureCollection
+}
+
+func (c Coordinate) tos2point() s2.Point {
+	ll := s2.LatLngFromDegrees(c[1], c[0])
+	p := s2.PointFromLatLng(ll)
+	return p
+}
+
+// IsValid vaildates coordinates (approximate)
+func (c Coordinate) IsValid() bool {
 	if c[0] == 0 || c[1] == 0 {
 		return false
 	}
 	return true
 }
 
-//Coordinates is a set of coordinate
-type Coordinates []Coordinate
-
+// tos2 transforms Coordinates to a s2 loop and
+// checks if the loop is CCW.
 func (cc Coordinates) tos2() (s2.Loop, error) {
 	pts := []s2.Point{}
 	for _, c := range cc {
@@ -52,14 +100,9 @@ func (cc Coordinates) tos2() (s2.Loop, error) {
 	return *s2.LoopFromPoints(pts), nil
 }
 
-// Point rapresent a geoJSON point geometry object
-type Point struct {
-	Type       string `json:"type"`
-	Coordinate `json:"coordinates"`
-}
-
-// ToS2 converts lat/long to S2Cellid. If p.Precision is specified then the
-// parent cellid at specfied level is returned.
+// ToS2 converts a Point to S2Cellid.
+// If precision is different than 30 (max) then the
+// parent cellid at specified level is returned.
 // levels go from 0 to 30:
 // for reference :
 // 30 covers 0.48cm2
@@ -71,7 +114,7 @@ func (p Point) ToS2(precision int) [][]uint64 {
 	cellID := s2.CellIDFromLatLng(ll)
 	// approximate returns
 	if precision != 30 {
-		log.Print("Rounding down")
+		log.Debug("Rounding down")
 		return [][]uint64{[]uint64{uint64(cellID.Parent(precision))}}
 	}
 	return [][]uint64{[]uint64{uint64(cellID)}}
@@ -94,28 +137,254 @@ func (p Point) ToGeoJSON(in [][]uint64) FeatureCollection {
 	return ff
 }
 
-// Polygon rapresent a geoJSON polygon geometry object
-type Polygon struct {
-	Type string        `json:"type"`
-	C    []Coordinates `json:"coordinates"`
+// innerLoop(s) return an s2.loop representation of the inner loop of the
+// geoJSON polygon or multi polygon. We do not support holes in polygons, so the inner ring of the geojson is discarded.
+// At this point winding order of the loops is not specified but it **must** be
+// counterclockwise, else we return an error.
+
+func (p Polygon) innerLoop() (s2.Loop, error) {
+	cds := p.C[0]
+	loop, err := cds.tos2()
+	return loop, err
+}
+func (pp MultiPolygon) innerLoops() ([]s2.Loop, error) {
+	var loops []s2.Loop
+	var err error
+	for _, c := range pp.C {
+		cds := c[0]
+		loop, err := cds.tos2()
+		if err != nil {
+			return loops, err
+		}
+		loops = append(loops, loop)
+	}
+	return loops, err
 }
 
-// ToS2 converts lat/long to S2Cellid.
-func (p Polygon) ToS2(precision *int) uint64 {
-	return uint64(1)
+// Contains check if the polygon contains the  point
+// TODO needs polish
+func (p Polygon) Contains(point point.Point) bool {
+	// TODO this has a bug
+	// maybe is the point to s2 conversion
+	var contains bool
+	ll, cell := point.ToCell()
+	loop, err := p.innerLoop()
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+
+	contains = loop.RectBound().ContainsCell(cell)
+	if !contains {
+		return false
+	}
+	contains = loop.ContainsPoint(s2.PointFromLatLng(ll))
+	return contains
 }
 
-// MultiPolygon rapresent a geojson mulitpolygon  geometry object
-type MultiPolygon struct {
-	Type string          `json:"type"`
-	C    [][]Coordinates `json:"coordinates"`
+func cellIDToPolygon(id uint64) (f Feature) {
+	cellid := s2.CellID(id)
+	cell := s2.CellFromCellID(cellid)
+	rect := cell.RectBound()
+	var coordinates Coordinates
+	var coordinates2 []Coordinates
+	for i := 0; i < 4; i++ {
+		ll := rect.Vertex(i)
+		// ll is the vertex of the  cellid
+		var ld Coordinate
+		ld = [2]float64{ll.Lng.Degrees(), ll.Lat.Degrees()}
+		coordinates = append(coordinates, ld)
+	}
+	// add first point as last point to close polygon
+	coordinates = append(coordinates, coordinates[0])
+	coordinates2 = append(coordinates2, coordinates)
+	polygon := Polygon{}
+	polygon.Type = "Polygon"
+	polygon.C = coordinates2
+	f.Type = "Feature"
+	prop := make(Prop)
+	prop["cellid"] = fmt.Sprintf("%v", cellid)
+	f.Properties = prop
+	f.Geometry = polygon
+	return f
 }
 
-// ToS2 converts lat/long to S2Cellid.
-func (p MultiPolygon) ToS2(precision *int) uint64 {
-	return uint64(1)
+func cellIDToCenterPoint(id uint64) (f Feature) {
+	cellid := s2.CellID(id)
+	// ll is the center of the  cellid
+	ll := cellid.LatLng()
+	var ld Coordinate
+	ld = [2]float64{ll.Lng.Degrees(), ll.Lat.Degrees()}
+	point := Point{}
+	point.Type = "Point"
+	point.Coordinate = ld
+	f.Type = "Feature"
+	prop := make(Prop)
+	prop["is_center"] = "true"
+	f.Properties = prop
+	f.Geometry = point
+	return f
 }
 
-type geojson interface {
-	ToS2(*int) uint64
+func boundingbox(loop s2.Loop) (f Feature) {
+	rect := loop.RectBound()
+	var coordinates Coordinates
+	var coordinates2 []Coordinates
+	for i := 0; i < 4; i++ {
+		ll := rect.Vertex(i)
+		// ll is the vertex of the  cellid
+		var ld Coordinate
+		ld = [2]float64{ll.Lng.Degrees(), ll.Lat.Degrees()}
+		coordinates = append(coordinates, ld)
+	}
+	// add last vertex
+	coordinates = append(coordinates, coordinates[0])
+	coordinates2 = append(coordinates2, coordinates)
+	polygon := Polygon{}
+	polygon.Type = "Polygon"
+	polygon.C = coordinates2
+	f = Feature{}
+	f.Type = "Feature"
+	prop := make(Prop)
+	prop["boundingbox"] = "true"
+	f.Properties = prop
+	f.Geometry = polygon
+	return
+}
+
+// transforms a loop to a sorted cellID collection
+func loopCoverer(loop s2.Loop, precision int) []uint64 {
+	debug := false
+	// now for bounds
+	rc := &s2.RegionCoverer{MinLevel: 0, MaxLevel: precision, MaxCells: 100}
+	r := s2.Region(loop.RectBound())
+	covering := rc.Covering(r)
+	// now approximate the bounding rect
+	var polygon []uint64
+	for _, val := range covering {
+		polygon = append(polygon, uint64(val))
+	}
+	// NOTE ++ TODO
+	// is this 100% correct ?
+	// in theory it is.
+	sort.Sort(intArray(polygon))
+	// NOTE this will be the actual polygonsponse
+	// when I/google finish updating the s2 library
+	// right now the region coverer for loops
+	// is buggy in the sense that it reutns
+	// just the boundary of the loop.
+	// by setting debug to true, one can
+	// visualize the json
+	if debug {
+		min := polygon[0]
+		max := polygon[len(polygon)-1]
+		rc := &s2.RegionCoverer{MinLevel: 15, MaxLevel: 30, MaxCells: 50}
+		covering := rc.Covering(s2.Region(loop))
+		var boundary []uint64
+		// now approximate the polygon
+		for _, val := range covering {
+			boundary = append(boundary, uint64(val))
+		}
+		for _, val := range boundary {
+			if val > max {
+				log.Printf("strange %v", val)
+			}
+			if val < min {
+				log.Printf("strange %v", val)
+			}
+		}
+		return boundary
+	}
+	return polygon
+}
+
+// ToS2 converts a geoJSON polygon to a set of cellUnions
+func (p Polygon) ToS2(precision int) [][]uint64 {
+	var polygons [][]uint64
+	loop, err := p.innerLoop()
+	if err != nil {
+		log.Print(err)
+		return polygons
+	}
+	polygon := loopCoverer(loop, precision)
+	polygons = append(polygons, polygon)
+	return polygons
+}
+
+// ToS2 converts a geoJSON multi polygon to a set of cellUnions
+func (pp MultiPolygon) ToS2(precision int) [][]uint64 {
+	var polygons [][]uint64
+	loops, err := pp.innerLoops()
+	if err != nil {
+		log.Print(err)
+		return polygons
+	}
+	for _, loop := range loops {
+		polygon := loopCoverer(loop, precision)
+		polygons = append(polygons, polygon)
+	}
+	return polygons
+}
+
+// ToGeoJSON converts polygon to geoJSON
+func (p Polygon) ToGeoJSON(in [][]uint64) FeatureCollection {
+	ff := FeatureCollection{}
+	ff.Type = "FeatureCollection"
+	var features []Feature
+	// NOTE  we expect one polygon
+	polygon := in[0]
+	for _, id := range polygon {
+		feature := cellIDToPolygon(id)
+		features = append(features, feature)
+	}
+	// add bbox
+	inner, err := p.innerLoop()
+	if err != nil {
+		log.Print(err)
+	}
+	bbox := boundingbox(inner)
+	features = append(features, bbox)
+	ff.Feat = features
+	return ff
+}
+
+// ToGeoJSON converts back a multipolygon to geoJSON
+func (pp MultiPolygon) ToGeoJSON(in [][]uint64) FeatureCollection {
+	ff := FeatureCollection{}
+	ff.Type = "FeatureCollection"
+	var features []Feature
+	for _, polygon := range in {
+		for _, id := range polygon {
+			feature := cellIDToPolygon(id)
+			features = append(features, feature)
+		}
+	}
+	// add bbox
+	innerloops, err := pp.innerLoops()
+	if err != nil {
+		log.Print(err)
+	}
+	for _, inner := range innerloops {
+		bbox := boundingbox(inner)
+		features = append(features, bbox)
+	}
+	ff.Feat = features
+	return ff
+}
+
+// HELPERS
+// sortable array
+type intArray []uint64
+
+func (s intArray) Len() int           { return len(s) }
+func (s intArray) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s intArray) Less(i, j int) bool { return s[i] < s[j] }
+
+// convert to string token
+func toToken(ci uint64) string {
+	s := strings.TrimRight(fmt.Sprintf("%016x", uint64(ci)), "0")
+	if len(s) == 0 {
+		return "X"
+	}
+	return s
 }

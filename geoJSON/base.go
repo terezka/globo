@@ -93,6 +93,8 @@ func (p Point) ToGeoJSON(in [][]uint64) FeatureCollection {
 	ff.Feat = features
 	return ff
 }
+
+// Polygon rapresent a geoJSON polygon geometry object
 type Polygon struct {
 	Type string        `json:"type"`
 	C    []Coordinates `json:"coordinates"`

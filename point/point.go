@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/giulioungaretti/geo/s2"
+
 	log "github.com/Sirupsen/logrus"
-	"github.com/golang/geo/s2"
 )
 
 // Point umarshal the json requests
@@ -27,7 +28,7 @@ type S2Point struct {
 }
 
 // IsValid vaildates point struct
-func (p *Point) IsValid() bool {
+func (p Point) IsValid() bool {
 	if p.Lat == 0 || p.Lng == 0 {
 		return false
 	}
@@ -48,6 +49,13 @@ func (p Point) ToS2() uint64 {
 		return uint64(cellID.Parent(*p.Precision))
 	}
 	return uint64(cellID)
+}
+
+// ToCell returns s2 cell id from lat long precision
+func (p Point) ToCell() (s2.LatLng, s2.Cell) {
+	ll := s2.LatLngFromDegrees(p.Lat, p.Lng)
+	cellID := s2.CellFromLatLng(ll)
+	return ll, cellID
 }
 
 func parseJSON(r *http.Request) (Point, error) {

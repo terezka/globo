@@ -12,7 +12,7 @@ import (
 
 // TimeOut handles timeout if request takes more than timeout
 func TimeOut(next http.Handler) http.Handler {
-	return http.TimeoutHandler(next, 10*time.Second, "timed out")
+	return http.TimeoutHandler(next, 1*time.Second, "timed out")
 }
 
 // IsJSON make sure that we get the request as tpye json

@@ -24,6 +24,34 @@ func (c *Coordinate) IsValid() bool {
 	return true
 }
 
+//Coordinates is a set of coordinate
+type Coordinates []Coordinate
+
+func (cc Coordinates) tos2() (s2.Loop, error) {
+	pts := []s2.Point{}
+	for _, c := range cc {
+		p := c.tos2point()
+		pts = append(pts, p)
+	}
+	origin := s2.OriginPoint()
+	for i := range pts {
+		j := 1 + i
+		k := 2 + i
+		if i == len(pts)-2 {
+			k = 0
+		}
+		if i == len(pts)-1 {
+			j = 0
+			k = 1
+		}
+		if !s2.OrderedCCW(pts[i], pts[j], pts[k], origin) {
+			err := fmt.Errorf("Polygon not ordered")
+			return *s2.LoopFromPoints(pts), err
+		}
+	}
+	return *s2.LoopFromPoints(pts), nil
+}
+
 // ToS2 converts lat/long to S2Cellid. If p.Precision is specified then the
 // parent cellid at specfied level is returned.
 // levels go from 0 to 30:

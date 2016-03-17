@@ -53,13 +53,26 @@ If the optional field "precision" is  specified then the parent cellid with
 level == precision is returned.
 
 
-### planned
 
 ```
-tos2/polygon
+tos2/geojson/:type
 ```
-Converts a geojson polygon to a collection of s2 cellIds (with the request precision/ maxnumber) + bounding box.
+Converts a geojson :type to a collection of s2 cellIds (with the request precision/ maxnumber) + bounding box, and returns a geojson feature collection that can be displayed
 
+Values accepted for :type: :
+
+ - point
+ - polygon
+ - multipolygon
+ 
+
+Query parameters:
+ - precision integer  specifies how precise the generated cellids should be, default max precision.
+
+
+Note:
+  if the any of the polygons are not CCW winded, we refuse to convert them.
+i.e. it's the client responsablity to send proper json.
 
 # install and build
 

@@ -39,8 +39,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s2 := resp.ToS2(precision)
-	geoj := resp.ToGeoJSON(s2)
+	geoj, err := resp.ToGeoJSON(precision)
 	// response
 	encoder := json.NewEncoder(w)
 	w.Header().Set("Content-Type", "application/json")

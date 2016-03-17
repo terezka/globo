@@ -55,8 +55,8 @@ type FeatureCollection struct {
 // geoJSON is the interface that allows any geojson to be unmarshaled
 // converted to s2, and marhsaled back to be visualized
 type geoJSON interface {
-	ToS2(int) [][]uint64
-	ToGeoJSON(in [][]uint64) FeatureCollection
+	ToS2(int) ([][]uint64, []s2.Loop, error)
+	ToGeoJSON(int) (FeatureCollection, error)
 }
 
 func (c Coordinate) tos2point() s2.Point {
@@ -108,21 +108,26 @@ func (cc Coordinates) tos2() (s2.Loop, error) {
 // 30 covers 0.48cm2
 // 12 covers 3.31km2
 // 0 covers 85,011,012 km2
-func (p Point) ToS2(precision int) [][]uint64 {
+func (p Point) ToS2(precision int) (ids [][]uint64, loops []s2.Loop, err error) {
 	c := p.Coordinate
 	ll := s2.LatLngFromDegrees(c[1], c[0])
 	cellID := s2.CellIDFromLatLng(ll)
 	// approximate returns
 	if precision != 30 {
 		log.Debug("Rounding down")
-		return [][]uint64{[]uint64{uint64(cellID.Parent(precision))}}
+		return [][]uint64{[]uint64{uint64(cellID.Parent(precision))}}, loops, nil
 	}
-	return [][]uint64{[]uint64{uint64(cellID)}}
+	return [][]uint64{[]uint64{uint64(cellID)}}, loops, nil
 }
 
 // ToGeoJSON converts point to geoJSON
-func (p Point) ToGeoJSON(in [][]uint64) FeatureCollection {
-	ff := FeatureCollection{}
+func (p Point) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
+	// ingore loops, as a point has obviously no loops
+	in, _, err := p.ToS2(precision)
+	if err != nil {
+		return
+	}
+	ff = FeatureCollection{}
 	ff.Type = "FeatureCollection"
 	var features []Feature
 	for _, id := range in[0] {
@@ -134,7 +139,7 @@ func (p Point) ToGeoJSON(in [][]uint64) FeatureCollection {
 		features = append(features, feature)
 	}
 	ff.Feat = features
-	return ff
+	return
 }
 
 // innerLoop(s) return an s2.loop representation of the inner loop of the
@@ -142,11 +147,13 @@ func (p Point) ToGeoJSON(in [][]uint64) FeatureCollection {
 // At this point winding order of the loops is not specified but it **must** be
 // counterclockwise, else we return an error.
 
-func (p Polygon) innerLoop() (s2.Loop, error) {
+func (p Polygon) innerLoops() (loops []s2.Loop, err error) {
 	cds := p.C[0]
 	loop, err := cds.tos2()
-	return loop, err
+	loops = append(loops, loop)
+	return loops, err
 }
+
 func (pp MultiPolygon) innerLoops() ([]s2.Loop, error) {
 	var loops []s2.Loop
 	var err error
@@ -168,17 +175,17 @@ func (p Polygon) Contains(point point.Point) bool {
 	// maybe is the point to s2 conversion
 	var contains bool
 	ll, cell := point.ToCell()
-	loop, err := p.innerLoop()
+	loop, err := p.innerLoops()
 	if err != nil {
 		log.Error(err)
 		return false
 	}
 
-	contains = loop.RectBound().ContainsCell(cell)
+	contains = loop[0].RectBound().ContainsCell(cell)
 	if !contains {
 		return false
 	}
-	contains = loop.ContainsPoint(s2.PointFromLatLng(ll))
+	contains = loop[0].ContainsPoint(s2.PointFromLatLng(ll))
 	return contains
 }
 
@@ -299,58 +306,61 @@ func loopCoverer(loop s2.Loop, precision int) []uint64 {
 }
 
 // ToS2 converts a geoJSON polygon to a set of cellUnions
-func (p Polygon) ToS2(precision int) [][]uint64 {
+func (p Polygon) ToS2(precision int) (ids [][]uint64, loops []s2.Loop, err error) {
 	var polygons [][]uint64
-	loop, err := p.innerLoop()
+	loops, err = p.innerLoops()
 	if err != nil {
-		log.Print(err)
-		return polygons
+		return polygons, loops, err
 	}
-	polygon := loopCoverer(loop, precision)
+	polygon := loopCoverer(loops[0], precision)
 	polygons = append(polygons, polygon)
-	return polygons
+	return polygons, loops, err
 }
 
 // ToS2 converts a geoJSON multi polygon to a set of cellUnions
-func (pp MultiPolygon) ToS2(precision int) [][]uint64 {
+func (pp MultiPolygon) ToS2(precision int) (ids [][]uint64, loops []s2.Loop, err error) {
 	var polygons [][]uint64
-	loops, err := pp.innerLoops()
+	loops, err = pp.innerLoops()
 	if err != nil {
-		log.Print(err)
-		return polygons
+		return polygons, loops, err
 	}
 	for _, loop := range loops {
 		polygon := loopCoverer(loop, precision)
 		polygons = append(polygons, polygon)
 	}
-	return polygons
+	return polygons, loops, err
 }
 
 // ToGeoJSON converts polygon to geoJSON
-func (p Polygon) ToGeoJSON(in [][]uint64) FeatureCollection {
-	ff := FeatureCollection{}
+func (p Polygon) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
+	in, loops, err := p.ToS2(precision)
+	if err != nil {
+		return
+	}
+	// NOTE  we expect one polygon/ one loop
+	polygon := in[0]
+	inner := loops[0]
+	ff = FeatureCollection{}
 	ff.Type = "FeatureCollection"
 	var features []Feature
-	// NOTE  we expect one polygon
-	polygon := in[0]
+	// add bbox
 	for _, id := range polygon {
 		feature := cellIDToPolygon(id)
 		features = append(features, feature)
 	}
-	// add bbox
-	inner, err := p.innerLoop()
-	if err != nil {
-		log.Print(err)
-	}
 	bbox := boundingbox(inner)
 	features = append(features, bbox)
 	ff.Feat = features
-	return ff
+	return
 }
 
 // ToGeoJSON converts back a multipolygon to geoJSON
-func (pp MultiPolygon) ToGeoJSON(in [][]uint64) FeatureCollection {
-	ff := FeatureCollection{}
+func (pp MultiPolygon) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
+	in, loops, err := pp.ToS2(precision)
+	if err != nil {
+		return
+	}
+	ff = FeatureCollection{}
 	ff.Type = "FeatureCollection"
 	var features []Feature
 	for _, polygon := range in {
@@ -360,16 +370,12 @@ func (pp MultiPolygon) ToGeoJSON(in [][]uint64) FeatureCollection {
 		}
 	}
 	// add bbox
-	innerloops, err := pp.innerLoops()
-	if err != nil {
-		log.Print(err)
-	}
-	for _, inner := range innerloops {
+	for _, inner := range loops {
 		bbox := boundingbox(inner)
 		features = append(features, bbox)
 	}
 	ff.Feat = features
-	return ff
+	return
 }
 
 // HELPERS

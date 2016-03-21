@@ -52,9 +52,9 @@ type FeatureCollection struct {
 	Feat []Feature `json:"features"`
 }
 
-// geoJSON is the interface that allows any geojson to be unmarshaled
+// GeoJSON is the interface that allows any geojson to be unmarshaled
 // converted to s2, and marhsaled back to be visualized
-type geoJSON interface {
+type GeoJSON interface {
 	ToS2(int) ([][]uint64, []s2.Loop, error)
 	ToGeoJSON(int) (FeatureCollection, error)
 }
@@ -283,6 +283,12 @@ func loopCoverer(loop s2.Loop, precision int) []uint64 {
 	// just the boundary of the loop.
 	// by setting debug to true, one can
 	// visualize the json
+	//min := polygon[0]
+	//max := polygon[len(polygon)-1]
+	//if len(polygon) > 1 {
+	//log.Infof("min: %v", min)
+	//log.Infof("max: %v", max)
+	//}
 	if debug {
 		min := polygon[0]
 		max := polygon[len(polygon)-1]

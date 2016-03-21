@@ -61,7 +61,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 func Matcher(r *http.Request) (p GeoJSON, err error) {
 	objectType := r.URL.Path[len(Endpoint):]
 	dec := json.NewDecoder(r.Body)
-	defer r.Body.Close()
 	switch objectType {
 	case "point":
 		// TODO this is ugly

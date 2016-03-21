@@ -8,6 +8,13 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/giulioungaretti/geo/s2",
+			"repository": "https://github.com/giulioungaretti/geo",
+			"revision": "954ddc45139057071ef99dd54ef0ba9499c9439b",
+			"branch": "master",
+			"path": "/s2"
+		},
+		{
 			"importpath": "github.com/golang/geo/r1",
 			"repository": "https://github.com/golang/geo",
 			"revision": "1e8d2b4605dfbb9666ef1be70bd68018e7c0d497",
@@ -36,11 +43,10 @@
 			"path": "/s1"
 		},
 		{
-			"importpath": "github.com/golang/geo/s2",
-			"repository": "https://github.com/golang/geo",
-			"revision": "1e8d2b4605dfbb9666ef1be70bd68018e7c0d497",
-			"branch": "master",
-			"path": "/s2"
+			"importpath": "github.com/justinas/alice",
+			"repository": "https://github.com/justinas/alice",
+			"revision": "29a850317649fc021f42f80ec29552f9a3156ee9",
+			"branch": "master"
 		},
 		{
 			"importpath": "gopkg.in/airbrake/gobrake.v2",

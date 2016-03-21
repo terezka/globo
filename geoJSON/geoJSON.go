@@ -33,7 +33,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Debugf("Request with precision: %v", precision)
 	// request
-	resp, err := matcher(r)
+	resp, err := Matcher(r)
 	if err != nil {
 		log.Error(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -52,8 +52,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// matcher exctract from the url witch geoJSON object we want
-func matcher(r *http.Request) (p geoJSON, err error) {
+// Matcher exctract from the url witch geoJSON object we want
+func Matcher(r *http.Request) (p GeoJSON, err error) {
 	objectType := r.URL.Path[len(Endpoint):]
 	dec := json.NewDecoder(r.Body)
 	defer r.Body.Close()

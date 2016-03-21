@@ -234,7 +234,7 @@ func cellIDToCenterPoint(id uint64) (f Feature) {
 	return f
 }
 
-func boundingbox(loop s2.Loop) (f Feature) {
+func boundingbox(loop s2.Loop, id int) (f Feature) {
 	rect := loop.RectBound()
 	var coordinates Coordinates
 	var coordinates2 []Coordinates
@@ -254,7 +254,7 @@ func boundingbox(loop s2.Loop) (f Feature) {
 	f = Feature{}
 	f.Type = "Feature"
 	prop := make(Prop)
-	prop["boundingbox"] = "true"
+	prop["boundingbox"] = fmt.Sprint(id)
 	f.Properties = prop
 	f.Geometry = polygon
 	return
@@ -349,7 +349,7 @@ func (p Polygon) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
 		feature := cellIDToPolygon(id)
 		features = append(features, feature)
 	}
-	bbox := boundingbox(inner)
+	bbox := boundingbox(inner, 0)
 	features = append(features, bbox)
 	ff.Feat = features
 	return
@@ -371,8 +371,8 @@ func (pp MultiPolygon) ToGeoJSON(precision int) (ff FeatureCollection, err error
 		}
 	}
 	// add bbox
-	for _, inner := range loops {
-		bbox := boundingbox(inner)
+	for i, inner := range loops {
+		bbox := boundingbox(inner, i)
 		features = append(features, bbox)
 	}
 	ff.Feat = features

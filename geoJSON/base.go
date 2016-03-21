@@ -81,22 +81,23 @@ func (cc Coordinates) tos2() (s2.Loop, error) {
 		p := c.tos2point()
 		pts = append(pts, p)
 	}
-	origin := s2.OriginPoint()
-	for i := range pts {
-		j := 1 + i
-		k := 2 + i
-		if i == len(pts)-2 {
-			k = 0
-		}
-		if i == len(pts)-1 {
-			j = 0
-			k = 1
-		}
-		if !s2.OrderedCCW(pts[i], pts[j], pts[k], origin) {
-			err := fmt.Errorf("Polygon not ordered")
-			return *s2.LoopFromPoints(pts), err
-		}
-	}
+	//origin := s2.OriginPoint()
+	//for i := range pts {
+	//j := 1 + i
+	//k := 2 + i
+	//if i == len(pts)-2 {
+	//k = 0
+	//}
+	//if i == len(pts)-1 {
+	//j = 0
+	//k = 1
+	//}
+	//if !s2.OrderedCCW(pts[i], pts[j], pts[k], origin) {
+	//err := fmt.Errorf("Polygon not ordered")
+	//log.Errorf("%v,%v,%v, %v", i, j, k, err)
+	////return *s2.LoopFromPoints(pts), err
+	//}
+	//}
 	return *s2.LoopFromPoints(pts), nil
 }
 

@@ -40,6 +40,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	geoj, err := resp.ToGeoJSON(precision)
+	if err != nil {
+		log.Error(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	// response
 	encoder := json.NewEncoder(w)
 	w.Header().Set("Content-Type", "application/json")

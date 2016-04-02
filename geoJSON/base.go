@@ -4,7 +4,7 @@ package geoJSON
 
 import (
 	"fmt"
-	"sort"
+	"math/rand"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -58,7 +58,7 @@ type MultiPolygon struct {
 }
 
 // Prop is a geoJSON property
-type Prop map[string]string
+type Prop map[string]interface{}
 
 // Feature is a geoJSON feature
 type Feature struct {
@@ -106,23 +106,6 @@ func (cc Coordinates) tos2() (s2.Loop, error) {
 		p := c.tos2point()
 		pts = append(pts, p)
 	}
-	//origin := s2.OriginPoint()
-	//for i := range pts {
-	//j := 1 + i
-	//k := 2 + i
-	//if i == len(pts)-2 {
-	//k = 0
-	//}
-	//if i == len(pts)-1 {
-	//j = 0
-	//k = 1
-	//}
-	//if !s2.OrderedCCW(pts[i], pts[j], pts[k], origin) {
-	//err := fmt.Errorf("Polygon not ordered")
-	//log.Errorf("%v,%v,%v, %v", i, j, k, err)
-	////return *s2.LoopFromPoints(pts), err
-	//}
-	//}
 	return *s2.LoopFromPoints(pts), nil
 }
 
@@ -156,12 +139,13 @@ func (p Point) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
 	ff = FeatureCollection{}
 	ff.Type = "FeatureCollection"
 	var features []Feature
+	color := randomCOlor()
 	for _, id := range in[0] {
 		// add center point
 		feature := cellIDToCenterPoint(id)
 		features = append(features, feature)
 		// add bounding box
-		feature = cellIDToPolygon(id)
+		feature = cellIDToPolygon(id, color)
 		features = append(features, feature)
 	}
 	ff.Feat = features
@@ -215,7 +199,7 @@ func (p Polygon) Contains(point point.Point) bool {
 	return contains
 }
 
-func cellIDToPolygon(id uint64) (f Feature) {
+func cellIDToPolygon(id uint64, color string) (f Feature) {
 	cellid := s2.CellID(id)
 	cell := s2.CellFromCellID(cellid)
 	rect := cell.RectBound()
@@ -237,9 +221,23 @@ func cellIDToPolygon(id uint64) (f Feature) {
 	f.Type = "Feature"
 	prop := make(Prop)
 	prop["cellid"] = fmt.Sprintf("%v", cellid)
+	prop["fill-opacity"] = 0.2
+	prop["fill"] = color
+	prop["stroke-width"] = 0
 	f.Properties = prop
 	f.Geometry = polygon
 	return f
+}
+
+// randomCOlor return a random hex color
+func randomCOlor() string {
+	n := 6
+	const letters = "1234567890"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return fmt.Sprintf("#%v", string(b))
 }
 
 func cellIDToCenterPoint(id uint64) (f Feature) {
@@ -345,8 +343,9 @@ func (p Polygon) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
 	ff.Type = "FeatureCollection"
 	var features []Feature
 	// add bbox
+	color := randomCOlor()
 	for _, id := range polygon {
-		feature := cellIDToPolygon(id)
+		feature := cellIDToPolygon(id, color)
 		features = append(features, feature)
 	}
 	bbox := boundingbox(inner, 0)
@@ -364,13 +363,14 @@ func (mp MultiPolygon) ToGeoJSON(precision int) (ff FeatureCollection, err error
 	ff = FeatureCollection{}
 	ff.Type = "FeatureCollection"
 	var features []Feature
+	color := randomCOlor()
 	for _, polygon := range in {
 		for _, id := range polygon {
-			feature := cellIDToPolygon(id)
+			feature := cellIDToPolygon(id, color)
 			features = append(features, feature)
 		}
 	}
-	// add bbox
+	//add bbox
 	for i, inner := range loops {
 		bbox := boundingbox(inner, i)
 		features = append(features, bbox)

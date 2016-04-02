@@ -1,5 +1,4 @@
-// GLOBO is a microservice that converts lat/long to s2
-// main.go
+// GLOBO A micro service that helps the transition from lat/long based system to google's S2
 // 2016 giulio <giulioungaretti@me.com>
 
 package main

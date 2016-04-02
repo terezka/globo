@@ -180,10 +180,10 @@ func (p Polygon) innerLoops() (loops []s2.Loop, err error) {
 	return loops, err
 }
 
-func (pp MultiPolygon) innerLoops() ([]s2.Loop, error) {
+func (mp MultiPolygon) innerLoops() ([]s2.Loop, error) {
 	var loops []s2.Loop
 	var err error
-	for _, c := range pp.C {
+	for _, c := range mp.C {
 		cds := c[0]
 		loop, err := cds.tos2()
 		if err != nil {
@@ -316,9 +316,9 @@ func (p Polygon) ToS2(precision int) (ids [][]uint64, loops []s2.Loop, err error
 }
 
 // ToS2 converts a geoJSON multi polygon to a set of cellUnions
-func (pp MultiPolygon) ToS2(precision int) (ids [][]uint64, loops []s2.Loop, err error) {
+func (mp MultiPolygon) ToS2(precision int) (ids [][]uint64, loops []s2.Loop, err error) {
 	var polygons [][]uint64
-	loops, err = pp.innerLoops()
+	loops, err = mp.innerLoops()
 	if err != nil {
 		return polygons, loops, err
 	}
@@ -356,8 +356,8 @@ func (p Polygon) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
 }
 
 // ToGeoJSON converts back a multipolygon to geoJSON
-func (pp MultiPolygon) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
-	in, loops, err := pp.ToS2(precision)
+func (mp MultiPolygon) ToGeoJSON(precision int) (ff FeatureCollection, err error) {
+	in, loops, err := mp.ToS2(precision)
 	if err != nil {
 		return
 	}

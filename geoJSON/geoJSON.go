@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -67,14 +68,23 @@ func Matcher(r *http.Request) (p GeoJSON, err error) {
 		pp := Point{}
 		err = dec.Decode(&pp)
 		p = pp
+		if strings.ToLower(pp.Type) != "point" {
+			err = fmt.Errorf("%v not  a geoJSON point", pp.Type)
+		}
 	case "polygon":
 		pp := Polygon{}
 		err = dec.Decode(&pp)
 		p = pp
+		if strings.ToLower(pp.Type) != "polygon" {
+			err = fmt.Errorf("%v not  a geoJSON polygon", pp.Type)
+		}
 	case "multipolygon":
 		pp := MultiPolygon{}
 		err = dec.Decode(&pp)
 		p = pp
+		if strings.ToLower(pp.Type) != "multipolygon" {
+			err = fmt.Errorf("%v not a geoJSON multipolygon", pp.Type)
+		}
 	default:
 		err = fmt.Errorf("Bad geoJSON object type")
 	}

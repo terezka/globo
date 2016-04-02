@@ -285,56 +285,22 @@ func boundingbox(loop s2.Loop, id int) (f Feature) {
 	return
 }
 
-// transforms a loop to a sorted cellID collection
-func loopCoverer(loop s2.Loop, precision int) []uint64 {
-	debug := false
-	// now for bounds
-	rc := &s2.RegionCoverer{MinLevel: 0, MaxLevel: precision, MaxCells: 100}
-	r := s2.Region(loop.RectBound())
-	covering := rc.Covering(r)
-	// now approximate the bounding rect
-	var polygon []uint64
-	for _, val := range covering {
-		polygon = append(polygon, uint64(val))
-	}
-	// NOTE ++ TODO
-	// is this 100% correct ?
-	// in theory it is.
-	sort.Sort(intArray(polygon))
-	// NOTE this will be the actual polygonsponse
-	// when I/google finish updating the s2 library
-	// right now the region coverer for loops
-	// is buggy in the sense that it reutns
-	// just the boundary of the loop.
-	// by setting debug to true, one can
-	// visualize the json
-	//min := polygon[0]
-	//max := polygon[len(polygon)-1]
-	//if len(polygon) > 1 {
-	//log.Infof("min: %v", min)
-	//log.Infof("max: %v", max)
-	//}
-	if debug {
-		min := polygon[0]
-		max := polygon[len(polygon)-1]
-		rc := &s2.RegionCoverer{MinLevel: 15, MaxLevel: 30, MaxCells: 50}
-		covering := rc.Covering(s2.Region(loop))
-		var boundary []uint64
+func loopCoverer(loop s2.Loop, precision int) ([]uint64, error) {
+	var boundary []uint64
+	for i := precision; i < 30; i++ {
+		rc := &s2.RegionCoverer{MinLevel: 0, MaxLevel: i, MaxCells: 500000}
+		covering := rc.InteriorCovering(s2.Region(loop))
+		log.Debug("done creating cover")
 		// now approximate the polygon
 		for _, val := range covering {
 			boundary = append(boundary, uint64(val))
 		}
-		for _, val := range boundary {
-			if val > max {
-				log.Printf("strange %v", val)
-			}
-			if val < min {
-				log.Printf("strange %v", val)
-			}
+		if len(boundary) > 0 {
+			return boundary, nil
 		}
-		return boundary
+		log.Warnf("Need to upscale precision to %v", i+1)
 	}
-	return polygon
+	return boundary, fmt.Errorf("Can't cover region.")
 }
 
 // ToS2 converts a geoJSON polygon to a set of cellUnions
@@ -344,7 +310,7 @@ func (p Polygon) ToS2(precision int) (ids [][]uint64, loops []s2.Loop, err error
 	if err != nil {
 		return polygons, loops, err
 	}
-	polygon := loopCoverer(loops[0], precision)
+	polygon, err := loopCoverer(loops[0], precision)
 	polygons = append(polygons, polygon)
 	return polygons, loops, err
 }
@@ -357,7 +323,10 @@ func (pp MultiPolygon) ToS2(precision int) (ids [][]uint64, loops []s2.Loop, err
 		return polygons, loops, err
 	}
 	for _, loop := range loops {
-		polygon := loopCoverer(loop, precision)
+		polygon, err := loopCoverer(loop, precision)
+		if err != nil {
+			return polygons, loops, err
+		}
 		polygons = append(polygons, polygon)
 	}
 	return polygons, loops, err

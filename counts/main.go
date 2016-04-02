@@ -31,7 +31,7 @@ const (
 var db *sql.DB
 var err error
 
-type Row struct {
+type row struct {
 	value  uint64
 	cellid uint64
 }
@@ -48,7 +48,7 @@ func checker(c, t *uint64, done chan struct{}) {
 	}
 }
 
-func processor(ch chan Row, count, processed *uint64, loop s2.Loop, bound s2.Rect) {
+func processor(ch chan row, count, processed *uint64, loop s2.Loop, bound s2.Rect) {
 	for row := range ch {
 		if containsCell(loop, bound, row.cellid) {
 			atomic.AddUint64(count, row.value)
@@ -190,7 +190,7 @@ loop:
 		// channels
 		var processed uint64
 		var count uint64
-		ch := make(chan Row, 1000)
+		ch := make(chan row, 1000)
 		done := make(chan struct{})
 
 		go checker(&processed, &rowsnumber, done)
@@ -199,7 +199,7 @@ loop:
 		}
 
 		for rows.Next() {
-			var row Row
+			var row row
 			if err := rows.Scan(&row.value, &row.cellid); err != nil {
 				log.Error(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)

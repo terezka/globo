@@ -15,8 +15,29 @@ import (
 //Coordinate is a [longitude, latitude]
 type Coordinate [2]float64
 
+// Lon returns the longitude
+func (c Coordinate) Lon() float64 {
+	return c[0]
+}
+
+// Lat returns the latitude
+func (c Coordinate) Lat() float64 {
+	return c[1]
+}
+
 //Coordinates is a set of coordinate
 type Coordinates []Coordinate
+
+// IsCW checks if the Coordinates are CW
+// it can return true also in edge cases
+func (cc Coordinates) IsCW() bool {
+	sum := 0.0
+	for i, c := range cc[:len(cc)-1] {
+		n := cc[i+1]
+		sum += (n.Lon() - c.Lon()) * (n.Lat() + c.Lat())
+	}
+	return sum > 0
+}
 
 // Point rapresent a geoJSON point geometry object
 type Point struct {
@@ -73,10 +94,14 @@ func (c Coordinate) IsValid() bool {
 	return true
 }
 
-// tos2 transforms Coordinates to a s2 loop and
-// checks if the loop is CCW.
+// tos2 transforms Coordinates to a s2 loop
+// return error if coordinates are not in CCW order
 func (cc Coordinates) tos2() (s2.Loop, error) {
 	pts := []s2.Point{}
+	if cc.IsCW() {
+		err := fmt.Errorf("Coordinates are not CCW winded")
+		return *s2.LoopFromPoints(pts), err
+	}
 	for _, c := range cc {
 		p := c.tos2point()
 		pts = append(pts, p)

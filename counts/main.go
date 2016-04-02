@@ -78,9 +78,8 @@ func connect() (db *sql.DB, err error) {
 	return
 }
 
-func query(db *sql.DB, dealerID int, minID, maxID uint64, start string, end string) (rows *sql.Rows, err error) {
-	if dealerID == 0 {
-		rows, err = db.Query(`
+func query(db *sql.DB, minID, maxID uint64, start string, end string) (rows *sql.Rows, err error) {
+	rows, err = db.Query(`
 	SELECT sum(count), s2cellid
 	FROM data
 	WHERE
@@ -92,21 +91,6 @@ func query(db *sql.DB, dealerID int, minID, maxID uint64, start string, end stri
 	GROUP BY
 		s2cellid
 	`, start, end, minID, maxID)
-		return
-	}
-	rows, err = db.Query(`
-	SELECT sum(count), s2cellid
-	FROM data
-	WHERE dealer = $1
-	AND
-		daterange($2::date, $3::date, '[]')
-		@> day
-	AND
-		numrange($4, $5)
-		@>s2cellid
-	GROUP BY
-		s2cellid
-	`, dealerID, start, end, minID, maxID)
 	return
 }
 
@@ -122,7 +106,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// parsq query
 	values := r.URL.Query()
 	var start string
-	var dealer int
 	var end string
 	var precision int
 	var err error
@@ -134,14 +117,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// set max precision
 		precision = 30
-	}
-	if dealers, ok := values["dealer"]; ok {
-		dealer, err = strconv.Atoi(dealers[0])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-	} else {
-		http.Error(w, "Missing dealer", http.StatusBadRequest)
 	}
 	if starts, ok := values["start"]; ok {
 		start = starts[0]
@@ -163,6 +138,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	// get data from geojson
 	cellUnions, loops, err := resp.ToS2(precision)
+	return
 	if err != nil {
 		log.Error(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -175,10 +151,10 @@ loop:
 	for i, ids := range cellUnions {
 		min := ids[0]
 		max := ids[len(ids)-1]
-		rows, err := query(db, dealer, min, max, start, end)
+		rows, err := query(db, min, max, start, end)
 		if err != nil {
 			log.Error(err)
-			log.Debug(dealer, min, max, nil, start, end)
+			log.Debug(min, max, nil, start, end)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			continue
 		}

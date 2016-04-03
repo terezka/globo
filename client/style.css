@@ -1,0 +1,65 @@
+body {
+	box-sizing: border-box;
+}
+
+#app {
+	display: block;
+	width: 100%;
+	max-width: 300px;
+	margin: 0 auto;
+}
+
+.form {
+	display: inline-block;
+	width: 100%;
+}
+
+.form__date,
+.form__text,
+.form__precision {
+	padding: 0.5em 0.25em;
+	margin: 0.5em 0;
+	border: 0;
+	border-bottom: 2px solid #00BCD4;
+}
+
+.form__date:focus,
+.form__text:focus,
+.form__precision:focus,
+.form__submit:focus {
+	outline: none;
+}
+
+.form__date {
+	display: inline-block;
+	width: 100%;
+}
+
+.form__text {
+	display: inline-block;
+	width: 100%;
+	clear: both;
+}
+
+.form__precision {
+	display: inline-block;
+	width: 100%;
+	clear: both;
+}
+
+.form__submit {
+	border: 0;
+	padding: 0.75em;
+	background: #00BCD4;
+	margin: 0.5em 0;
+	display: inline-block;
+	clear: both;
+	color: #fff;
+	width: 100%;
+}
+
+.map {
+	display: inline-block;
+	width: 100%;
+	margin: 1em 0;
+}

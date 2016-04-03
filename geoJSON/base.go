@@ -5,6 +5,7 @@ package geoJSON
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -284,7 +285,7 @@ func boundingbox(loop s2.Loop, id int) (f Feature) {
 }
 
 func loopCoverer(loop s2.Loop, precision int) ([]uint64, error) {
-	var boundary []uint64
+	var boundary intArray
 	for i := precision; i < 30; i++ {
 		rc := &s2.RegionCoverer{MinLevel: 0, MaxLevel: i, MaxCells: 500000}
 		covering := rc.InteriorCovering(s2.Region(loop))
@@ -293,7 +294,9 @@ func loopCoverer(loop s2.Loop, precision int) ([]uint64, error) {
 		for _, val := range covering {
 			boundary = append(boundary, uint64(val))
 		}
-		if len(boundary) > 0 {
+		// crude check to make sure we get enough covering
+		if len(boundary) > 4 {
+			sort.Sort(boundary)
 			return boundary, nil
 		}
 		log.Warnf("Need to upscale precision to %v", i+1)

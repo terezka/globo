@@ -138,7 +138,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	// get data from geojson
 	cellUnions, loops, err := resp.ToS2(precision)
-	return
 	if err != nil {
 		log.Error(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)

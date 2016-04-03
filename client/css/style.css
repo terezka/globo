@@ -5,7 +5,7 @@ body {
 #app {
 	display: block;
 	width: 100%;
-	max-width: 300px;
+	max-width: 600px;
 	margin: 0 auto;
 }
 
@@ -60,6 +60,7 @@ body {
 
 .map {
 	display: inline-block;
+    height:600px;	
 	width: 100%;
 	margin: 1em 0;
 }

@@ -130,7 +130,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// match geoJSON type
-	resp, err := Matcher(r)
+	resp, err := geoJSON.Matcher(r, Endpoint)
 	if err != nil {
 		log.Error(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -216,28 +216,4 @@ func containsCell(l s2.Loop, bound s2.Rect, cellid uint64) (res bool) {
 		return true
 	}
 	return res
-}
-
-// Matcher exctract from the url witch geoJSON object we want
-func Matcher(r *http.Request) (p geoJSON.GeoJSON, err error) {
-	objectType := r.URL.Path[len(Endpoint):]
-	dec := json.NewDecoder(r.Body)
-	switch objectType {
-	case "point":
-		// TODO this is ugly
-		pp := geoJSON.Point{}
-		err = dec.Decode(&pp)
-		p = pp
-	case "polygon":
-		pp := geoJSON.Polygon{}
-		err = dec.Decode(&pp)
-		p = pp
-	case "multipolygon":
-		pp := geoJSON.MultiPolygon{}
-		err = dec.Decode(&pp)
-		p = pp
-	default:
-		err = fmt.Errorf("Bad geoJSON object type")
-	}
-	return p, err
 }

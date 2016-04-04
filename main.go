@@ -35,6 +35,10 @@ func main() {
 	// query
 	count := http.HandlerFunc(counts.Handler)
 	http.Handle(counts.Endpoint, count)
+
+	// client handle
+	http.Handle("/", http.FileServer(http.Dir("./client")))
+
 	// server
 	port := os.Getenv("PORT")
 	lvl, err := ParseLogLevel(os.Getenv("LOGLEVEL"))

@@ -1,7 +1,7 @@
 body {
 	box-sizing: border-box;
+	font-family: Lato;
 }
-
 #app {
 	display: block;
 	width: 100%;
@@ -60,7 +60,7 @@ body {
 
 .map {
 	display: inline-block;
-    height:600px;	
+        height:500px;	
 	width: 100%;
 	margin: 1em 0;
 }

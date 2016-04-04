@@ -1,3 +1,9 @@
+const  myStyle = {
+    "color": "#ff7800",
+    "weight": 1,
+    "opacity": 0.65
+};
+
 const data = {
       "type": "MultiPolygon",
       "coordinates": [
@@ -28,13 +34,13 @@ const data = {
       ]
 }
 
-function fetchMultipolygon(precision, callback) {
+function fetchMultipolygon(precision, geoJSON, callback) {
   $.ajax({
     url: '/tos2/geojson/multipolygon?precision=' + precision,
     method: 'POST',
     contentType: 'application/json',
     dataType: 'json',
-    data: JSON.stringify(data),
+    data: geoJSON,
     success: data => callback(data),
     error: err => callback('Call to /multipolygon failed')
   })
@@ -47,6 +53,7 @@ class App extends React.Component {
       firstDate: '',
       secondDate: '',
       text: '',
+      input : JSON.stringify( data),
       precision: 12,
       result: null
     }
@@ -59,16 +66,14 @@ class App extends React.Component {
   }
 
   handleSubmit() {
-    // TODO how to validate ? i.e number ?
-    // make the box red and show error
-    const {precision } = this.state
-    fetchMultipolygon(precision, result => this.setState({
+    const {precision, input } = this.state
+    fetchMultipolygon(precision, input, result => this.setState({
       result
     }))
   }
 
   render() {
-    const { firstDate, secondDate, text, precision, result } = this.state
+    const { firstDate, secondDate, text, input, precision, result } = this.state
 
     return (
       <div id="app">
@@ -77,9 +82,12 @@ class App extends React.Component {
           <input ref="firstDate" placeholder="Date from" className="form__date form__date--first" onChange={this.handleInput.bind(this, 'firstDate')} value={firstDate} />
           <input ref="secondDate" placeholder="Date to" className="form__date form__date--second" onChange={this.handleInput.bind(this, 'secondDate')} value={secondDate} />
           <input ref="text" placeholder="Text" className="form__text" onChange={this.handleInput.bind(this, 'text')} value={text} />
+          <input ref="input" placeholder="Text" className="form__text" onChange={this.handleInput.bind(this, 'input')} value={input} />
           <input ref="precision" placeholder="Precision" className="form__precision" onChange={this.handleInput.bind(this, 'precision')} value={precision} />
           <button className="form__submit" onClick={this.handleSubmit}>Submit</button>
-          <Map data={result} />
+	  {result ?
+		  <Map data={result} input={JSON.parse(input)} />  : null
+	  }
         </div>
      </div>
     )
@@ -92,17 +100,18 @@ var Map = React.createClass({
       minZoom: 2,
       maxZoom: 20,
       layers: [
-        L.tileLayer(
-          'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'
-          })
+	  L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
+		maxZoom: 15,
+		attribution: 'mapbox',
+		id: 'giulio.jlndbmja'
+	    })
       ],
       attributionControl: false,
     });
     map.on('click', this.onMapClick);
-    var base =  L.geoJson()
+    var  base= this.base =  L.geoJson()
     base.addTo(this.map);
-    base.addData(data);
+    base.addData(this.props.input);
     map.fitBounds(base.getBounds())
   },
   componentWillUnmount: function() {
@@ -110,6 +119,7 @@ var Map = React.createClass({
     this.map = null;
   },
   onMapClick: function() {
+	  console.log(this)
     console.log(this.props.data);
   },
   shouldComponentUpdate: function(nextProps, nextState) {
@@ -118,13 +128,22 @@ var Map = React.createClass({
   componentWillUpdate: function(nextProps, nextState){
 		// perform any preparations for an upcoming update
 		this.map.removeLayer(this.layer)
+		this.map.removeLayer(this.base)
   },
   render: function() {
+
     var layer = this.layer = L.geoJson()
-    if (this.props.data !== null) {
-      layer.addTo(this.map);
-      this.layer.addData(this.props.data);
-			map.fitBounds(this.layer.getBounds())
+    if (this.props.data !== null && this.map ) {
+      layer.addTo(this.map)
+      layer.addData(this.props.data)
+      layer.setStyle(myStyle)
+      this.map.fitBounds(this.layer.getBounds())
+    }
+    var base = this.base = L.geoJson()
+    if (this.props.input !== null && this.map ) {
+      base.addTo(this.map)
+      base.addData(this.props.input)
+      this.map.fitBounds(this.layer.getBounds())
     }
     return ( 
       <div className = 'map' >
